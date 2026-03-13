@@ -1,0 +1,95 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+### FHN MODEL : DISCRETIZZAZIONE SEMI IMPLICITA 
+
+# Parametri 
+sigma = 0.001
+b, beta, delta = 5, 0.1, 1
+c, gamma, epsilon = 1, 0.25, 0.1
+T = 10  
+L = 1   
+
+n = 100 
+m = 5000
+h = L / n  
+tau = T / m 
+
+alpha = sigma / h**2
+
+x = np.linspace(0, L, n)
+t = np.linspace(0, T, m)
+
+# Matrice A approssima la derivata seconda (termine diffusivo)
+A = np.zeros((n, n))
+for i in range(1, n - 1):
+    A[i, i] =  2 * alpha
+    A[i, i - 1] = - alpha
+    A[i, i + 1] = - alpha
+
+# condizioni neumann : derivata nulla agli etsremi dle dominio 
+# dvdx =  v1 - v0 / h  = 0 --> v1 = v0
+A[0, 0] = alpha
+A[-1, -1] =  alpha
+A[0 , 1] = -alpha 
+A[-1, -2] = - alpha
+
+M = np.eye(n) 
+M[0, 0] = 1 / 2
+M[-1, -1] = 1 / 2
+
+# Sistema finale
+J = M/tau + A
+
+# --------------------------------------------------------------------------------
+
+v = np.zeros_like(x)
+w = np.zeros_like(v)  
+
+'''
+# Funzione per I_app(x, t) 1 stimolo
+def I_app(x, t):
+    I = np.zeros_like(x)
+    if 0 <= t <= 1:
+        I[(x >= 0) & (x <= 0.4)] = 100  # Stimolo iniziale a sinistra
+    return I
+'''
+
+# 2 stimoli 
+def I_app_2 (x, t):
+    I = np.zeros_like(x)
+    if 0 <= t <= 1:
+        I[(x >= 0) & (x <= 0.35)] = 100  # Stimolo sinistro
+        I[(x >= 0.96) & (x <= 1)] = 50  # Stimolo destro
+    return I
+
+def F(v, w):
+    return b * v * (v - beta) * (delta - v) - c * w
+
+def G(v, w):
+    return epsilon * (v - gamma * w)
+
+
+# Simulazione temporale
+v_all = []
+for step, current_time in enumerate(t):
+    reaction = F(v, w)+ I_app_2(x, current_time)
+    rhs_v = (1 / tau) * M @ v - M @ reaction
+    v_new =  np.linalg.solve(J, rhs_v)  #risolve il sistema J * x  = rhs_v 
+    w_new = w +  tau * G(v_new, w)  # ???
+
+    v, w = v_new, w_new
+
+    if step % int(len(t) / 50) == 0:
+        v_all.append(v.copy())
+
+plt.figure(figsize=(8, 6))
+for i, v_snapshot in enumerate(v_all[::50]):
+    plt.plot(x, v_snapshot, label=f"t={i * tau * 100:.2f}")
+plt.xlabel("Spazio x")
+plt.ylabel("v(x, t)")
+plt.title("Evoluzione di v(x, t)")
+plt.legend()
+plt.grid()
+plt.show()
