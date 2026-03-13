@@ -1,0 +1,96 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import odeint
+
+# Definizione della funzione Hodgkin-Huxley
+
+def HH(y, t, T, shift, I_app):
+    V, m, h, n = y
+
+    # Definizione delle costanti di transizione
+    alpha_m = 0.1 * (25 - V) / (np.exp((25 - V) / 10) - 1) if V != 25 else 1.0
+    beta_m = 4 * np.exp(-V / 18)
+
+    alpha_h = 0.07 * np.exp(-V / 20)
+    beta_h = 1 / (np.exp((30 - V) / 10) + 1)
+
+    alpha_n = 0.01 * (10 - V) / (np.exp((10 - V) / 10) - 1) if V != 10 else 0.1
+    beta_n = 0.125 * np.exp(-V / 80)
+
+    # Equazioni differenziali
+    dVdt = -(g_Na * m**3 * h * (V - V_Na) + g_K * n**4 * (V - V_K) + g_L * (V - V_L)) / C + I_app / C
+    dmdt = alpha_m * (1 - m) - beta_m * m
+    dhdt = alpha_h * (1 - h) - beta_h * h
+    dndt = alpha_n * (1 - n) - beta_n * n
+
+    if t % shift <= T: 
+        dVdt += I_app / C
+
+    return [dVdt, dmdt, dhdt, dndt]
+
+# Parametri
+C = 1  # microF/cm^2
+g_Na = 120  # mOhm^-1/cm^2
+g_K = 36
+g_L = 0.3
+V_Na = 115
+V_K = -12
+V_L = 10.6
+I_app = 30
+T = 0.1 #ms 
+shift = 1
+
+# Tempo
+t = np.linspace(0, 100, 1000)
+
+# Condizioni iniziali
+y0 = [12, 5.2934 * np.exp(-2), 5.9611 * np.exp(-1), 3.1768 * np.exp(-1)]
+y0_ex3 =  [2.7570*np.exp(-4), 5.2934* np.exp(-2), 5.9611*np.exp(-1), 3.1768*np.exp(-1)]
+
+# Soluzione dell'ODE
+solution = odeint(HH, y0, t, args = (T, shift, I_app))
+
+# Grafici
+fig, axes = plt.subplots(2, 2, figsize=(10, 6))
+
+axes[0][0].plot(t, solution[:, 0], label="V")
+axes[0][1].plot(t, solution[:, 1], label="m")
+axes[1][0].plot(t, solution[:, 2], label="h")
+axes[1][1].plot(t, solution[:, 3], label="n")
+
+axes[0][0].legend()
+axes[0][1].legend()
+axes[1][0].legend()
+axes[1][1].legend()
+plt.tight_layout()
+
+plt.show()
+
+-------
+
+
+V0_test = [ 2, 5, 7,  11] 
+
+for i in V0_test:
+    y0[0] = i  
+    sol = odeint(HH, y0, t, args=(T, shift, I_app))
+    if max(sol[:, 0]) > 50: 
+        plt.plot(t, sol[:, 0], label=f"V soglia = {i} mV")
+        plt.title("Treshold Potential")
+        plt.xlabel("Tempo (ms)")
+        plt.ylabel("Cell Potential (mV)")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+
+------------------
+
+
+# ex3 
+I_app = [60, 65, 65.5, 80, 100]  ## Iapp <= 65 non si ha un PA
+
+for j in I_app:
+    sol_3 = odeint(HH, y0_ex3, t, args = (T, shift, j))
+    plt.plot(t, sol_3[:, 0])
+    plt.show()

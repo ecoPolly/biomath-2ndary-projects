@@ -1,0 +1,108 @@
+FHN MODEL - implementato Roger McCulloch 
+
+
+### FHN MODEL : DISCRETIZZAZIONE SEMI IMPLICITA 
+## vedi Roger McCulloch per test
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Parametri 
+sigma = 0.002
+g, beta, delta = 1.5, 0.1, 1
+vth, vp = 13, 100
+mu1, gamma, mu2 = 4.4, 0.25, 0.012
+T = 50
+L = 1
+
+n = 101
+m = 1000
+h = L / n  
+tau = 0.05 #ms
+
+alpha = sigma / h**2
+
+x = np.linspace(0, L, n)
+t = np.linspace(0, T, m)
+
+
+# Matrice A approssima la derivata seconda (termine diffusivo)
+A = np.zeros((n, n))
+for i in range(1, n - 1):
+    A[i, i] =  2 * alpha
+    A[i, i - 1] = - alpha
+    A[i, i + 1] = - alpha
+
+# condizioni neumann : derivata nulla agli etsremi dle dominio 
+# dvdx =  v1 - v0 / h  = 0 --> v1 = v0
+A[0, 0] = alpha
+A[-1, -1] =  alpha
+A[0 , 1] = -alpha 
+A[-1, -2] = - alpha
+
+M = np.eye(n) 
+M[0, 0] = 1 / 2
+M[-1, -1] = 1 / 2
+#M [0, 1] = M[-1, -2] = -1
+
+# Sistema finale
+J = M/tau +  A
+
+# --------------------------------------------------------------------------------
+
+v = np.zeros_like(x)
+w = np.zeros_like(v)  
+
+t2 = [12, 13, 14, 15]
+
+def I_app_2(x, t):
+    I = np.zeros_like(x)  
+    if 0 <= t <= 2: 
+        I[(x >= 0) & (x <= 0.04)] = 60  
+
+    for i in t2:
+        if i <= t <= i + 2:
+            I[(x >= 0) & (x <= 0.04)] = 100
+    return I
+
+def F(v, w):
+    return (- g * v * (1- v/vth) * (1 - v/vp) - mu1*v*w)
+#b * v * (v - beta) * (delta - v) - c * w
+
+def G(v, w):
+    return  mu2 * (v/vp - w)
+#epsilon * (v - gamma * w)
+
+
+# Simulazione temporale
+v_all = []
+
+for step, current_time in enumerate(t):
+    reaction = F(v, w)+ I_app_2(x, current_time)
+    rhs_v = (1 / tau) * M @ v + M @ reaction
+  
+    v_new =  np.linalg.solve(J, rhs_v)  #rislve il sistema J * x  = rhs_v 
+    w_new = w +  tau * G(v_new, w) 
+
+    v, w = v_new, w_new
+
+    if step % int(len(t) / 25) == 0:
+        v_all.append(v.copy())
+
+plt.figure(figsize=(8, 6))
+for i, v_snapshot in enumerate(v_all):
+    plt.plot(x, v_snapshot, label=f"t={i * tau * 15:.2f}")
+plt.xlabel("Spazio x")
+plt.ylabel("v(x, t)")
+plt.title("Evoluzione di v(x, t)")
+plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')  
+plt.grid()
+plt.show()
+
+## commento
+# i fronti d'onda compaiono , ma l'intensità nè la posizione (x<0.04) sono corretti. 
+# non ho calcolato CV per questo motivo. Sembrano avere stessa dinamica. 
+# ho ridotto T e di conseguenza anche i t2. perché richiedevano circa 3min per runnare ogni volta 
+
+
+## allego lo screen del plot nella mail
